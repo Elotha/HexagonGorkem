@@ -20,16 +20,16 @@ public class GameController : MonoBehaviour
     [SerializeField] private float RotationTime = 0.3f; //Altıgenlerin bir defalık dönme süresi
 
     //Skor, hareket sayısı, yıldızlı altıgen, bomba
-    [SerializeField] private int Score = 0; //Oyuncunun skoru
-    [SerializeField] private int Moves = 0; //Oyuncunun yaptığı toplam hareket sayısı
     [SerializeField] private int StarPercent = 8; //Yıldızlı altıgenin çıkmasının yüzde ihtimali
     [SerializeField] private Sprite StarSprite; //Yıldızlı altıgenin görseli
     [SerializeField] private Sprite BombSprite; //Bombalı altıgenin görseli
     [SerializeField] private GameObject BombUIObject; //Bombanın UI objesi
     [SerializeField] private GameObject ScoreObject; //Skorun UI objesi
     [SerializeField] private GameObject MovesObject; //"MovesText" objesi
-    [SerializeField] private int BombCountdownMax = 10; //Bomba için geri sayımın başladığı sayı
+    [SerializeField] private int BombCountdownMax = 5; //Bomba için geri sayımın başladığı sayı
     [SerializeField] private int BombMinimumScore = 1000; //Bomba için gerekli skor miktarı
+    private int Score = 0; //Oyuncunun skoru
+    private int Moves = 0; //Oyuncunun yaptığı toplam hareket sayısı
     private List<BombList> Bombs = new List<BombList>(); //Bombaların pozisyon ve sayaçlarını tutan liste
     private int BombCount = 0; //Oyun boyunca yaratılan bomba sayısı
     private Text ScoreText; //Skor texti
@@ -56,9 +56,6 @@ public class GameController : MonoBehaviour
     private float previousTileScale; //Altıgenlerin boyutunu oyun sırasında ayarlayabilmek için gereken bir değer
     private float debugWaitingTime = 0.05f; //Debug amaçlı olarak altıgenlerin düşmesi ve yenilerinin yaratılmasının bekleme miktarı
 
-
-    
-    // Start is called before the first frame update
     void Start()
     {
         //Altıgenlerin boyutunu "TileScale" değerine eşle
@@ -152,7 +149,7 @@ public class GameController : MonoBehaviour
 
         //Yapılabilecek hiçbir hamle yoksa sahneyi yenile
         if (!AnyMovesLeft()) {
-            Debug.Log("Oyun başarısız başladı, yenileniyor.");
+            Debug.Log("Game field refreshed.");
             for(var q = 0; q < TileParent.childCount; q++) {
                 Destroy(TileParent.GetChild(q).gameObject);
             }
@@ -249,7 +246,7 @@ public class GameController : MonoBehaviour
                             for (var s = 0; s < SelectedTileObjects.Length; s++) {
                                 Pos = SelectedTileObjects [s].transform.position;
                                 SelectedTileObjects [s].transform.position = new Vector3(Pos.x,Pos.y,0f);
-                                SelectedTileObjects [s].transform.localRotation = Quaternion.identity;
+                                //SelectedTileObjects [s].transform.localRotation = Quaternion.identity;
                             }
                         }
                         else {
@@ -305,7 +302,7 @@ public class GameController : MonoBehaviour
             }
         }
         if ((MiddlePoints[Result].PointPosition - MousePos).sqrMagnitude > AllowedDistance) {
-            //Debug.Log("Maksimum mesafeyi aştı!");
+            //Debug.Log("Touch exceeded the maximum allowed distance!");
             return -1;
         }
         return Result;
@@ -320,6 +317,8 @@ public class GameController : MonoBehaviour
     //Swipe mekaniğini çalıştır
     IEnumerator RotateSelection(int sign)
     {
+        //Fırsatım olduğunda bu fonksiyonu kısaltacağım.
+
         StartCoroutine(Rotation(sign)); //Bir defa döndür
         yield return new WaitForSeconds(RotationTime);
         SwitchTiles(sign); //Üç altıgenin bilgilerini takas et
@@ -442,7 +441,7 @@ public class GameController : MonoBehaviour
                 else if (_tileType == "Bomb") {
                     for(var g = 0; g < Bombs.Count; g++) {
                         if (Bombs[g].TileGridPosition == new Vector2Int(ColorMatchPoints [i].x,ColorMatchPoints [i].y)) {
-                            Bombs.RemoveAt(g); //Bombayı listeden sil
+                            Bombs.Remove(Bombs[g]); //Bombayı listeden sil
                             break;
                         }
                     }
@@ -457,7 +456,7 @@ public class GameController : MonoBehaviour
             Score += TempScore;
             ScoreText.text = Score.ToString();
 
-            //Yok olan altıgenler için yukarıdan yeni altıgenler indir
+            //Yok olan altıgenler için yukarıdan altıgenleri aşağı taşı
             StartCoroutine(ShiftTiles());
         }
     }
@@ -466,7 +465,6 @@ public class GameController : MonoBehaviour
     IEnumerator ShiftTiles()
     {
         yield return new WaitForSeconds(debugWaitingTime + 0.1f);
-
         List<int> XList = new List<int>();
 
         //Her bir renk eşleşmesi pozisyonu için çalıştır
@@ -492,7 +490,6 @@ public class GameController : MonoBehaviour
                 while (GameGrid [pointX,targetTile].Empty) {
                     targetTile++;
                     if (targetTile == GridSize.y) { //Üstünde başka altıgen yok
-                        //Debug.Log("Mesafe aşıldı");
                         emptyTile--; //Bunu neden yaptığımı ben de bilmiyorum, denedim
                         break;
                     }
@@ -530,6 +527,7 @@ public class GameController : MonoBehaviour
             Swipe = false; //Her şey bittiğinde oyuncuya tekrar swipe yapabilme hakkını ver
             BombCountdown(); //Bombaların sayacını çalıştır
             AnyMovesLeft(); //Yapılabilecek hareket kaldı mı?
+            TempBugFix(); //Geçici olarak bug fixlemek için yazdığım fonksiyon
         }
         else {
             DestroyTiles(); //Tekrar eşleşme varsa eşleşen altıgenleri yok et
@@ -559,7 +557,7 @@ public class GameController : MonoBehaviour
         int starRnd = Random.Range(0,100);
 
 
-        if (Score >= BombMinimumScore*(BombCount+1) && Bombs.Count == 0) {
+        if (Score >= BombMinimumScore*(BombCount+1)) {
             BombCount++;
             _tileType = "Bomb";
             tileObj.GetComponent<SpriteRenderer>().sprite = BombSprite;
@@ -578,35 +576,10 @@ public class GameController : MonoBehaviour
         GameGrid [pointX,pointY].TileType = _tileType;
         tileObj.GetComponent<SpriteRenderer>().color = col;
     }
-
-    //Editörden altıgenlerin boyutunun ayarlanabilmesi için gereken fonksiyon
-    void ScaleTiles()
-    {
-        if (TileScale != previousTileScale) {
-            for (var k = 0; k < TileParent.transform.childCount; k++) {
-                TileParent.transform.GetChild(k).localScale = new Vector3(TileScale,TileScale,TileScale);
-            }
-        }
-        previousTileScale = TileScale;
-    }
-
-
-    //Altıgenler patladığında oluşan partikül efekti
-    IEnumerator ParticleEffect (int i)
-    {
-        yield return new WaitForSeconds(0.1f);
-        var Part = Instantiate(Particle,GameGrid [ColorMatchPoints [i].x,ColorMatchPoints [i].y].TileWorldPosition,Quaternion.Euler(new Vector3(0f,0f,180f)),ParticleParent);
-        Color col = GameGrid [ColorMatchPoints [i].x,ColorMatchPoints [i].y].TileColor;
-        ParticleSystem PartSys = Part.GetComponent<ParticleSystem>();
-        var main = PartSys.main;
-        main.startColor = col;
-
-    }
-
     //Bomba varsa geri sayımı çalıştır
     void BombCountdown()
     {
-        if (Bombs.Count != 0) {
+        if (Bombs.Count > 0) {
             for(var c = 0; c < Bombs.Count; c++) {
                 if (Bombs[c].IsBombNew) { //Eğer bomba yeni yaratılmışsa, bir turluğuna sayacını değiştirme
                     Bombs [c].IsBombNew = false;
@@ -621,6 +594,7 @@ public class GameController : MonoBehaviour
         }
     }
 
+    //Yapılabilecek bir hareket kaldı mı, onu kontrol eden fonksiyon
     bool AnyMovesLeft()
     {
         bool boolPos;
@@ -703,6 +677,55 @@ public class GameController : MonoBehaviour
             SelectedTileObjects [s] = GameGrid [SelectedTiles [s].x,SelectedTiles [s].y].TileObject;
             var Pos = SelectedTileObjects [s].transform.position;
             SelectedTileObjects [s].transform.position = new Vector3(Pos.x,Pos.y,-1f);
+        }
+    }
+
+    //Editörden altıgenlerin boyutunun ayarlanabilmesi için gereken fonksiyon
+    void ScaleTiles()
+    {
+        if (TileScale != previousTileScale) {
+            for (var k = 0; k < TileParent.transform.childCount; k++) {
+                TileParent.transform.GetChild(k).localScale = new Vector3(TileScale,TileScale,TileScale);
+            }
+        }
+        previousTileScale = TileScale;
+    }
+
+    //Altıgenler patladığında oluşan partikül efekti
+    IEnumerator ParticleEffect (int i)
+    {
+        yield return new WaitForSeconds(0.1f);
+        var Part = Instantiate(Particle,GameGrid [ColorMatchPoints [i].x,ColorMatchPoints [i].y].TileWorldPosition,Quaternion.Euler(new Vector3(0f,0f,180f)),ParticleParent);
+        Color col = GameGrid [ColorMatchPoints [i].x,ColorMatchPoints [i].y].TileColor;
+        ParticleSystem PartSys = Part.GetComponent<ParticleSystem>();
+        var main = PartSys.main;
+        main.startColor = col;
+
+    }
+
+    //Yüzde bir ihtimalle falan, yaratılmaması gereken altıgenler yaratılıyor. Henüz bugı çözemedim, bu sebeple etrafından dolandım. 
+    //Ancak fırsatım olduğunda bugı çözüp bu fonksiyonu silicem.
+    void TempBugFix()
+    {
+        bool boolDestroy;
+        GameObject tileObj;
+        for(var h = 0; h < TileParent.transform.childCount; h++) {
+            tileObj = TileParent.transform.GetChild(h).gameObject;
+            boolDestroy = true;
+            for (var j = 0; j < GridSize.y; j++) {
+                if (boolDestroy) {
+                    for (var i = 0; i < GridSize.x; i++) {
+                        if (GameGrid [i,j].TileObject == tileObj) {
+                            boolDestroy = false;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (boolDestroy) {
+                Destroy(tileObj,0.05f);
+                Debug.Log("TempFix");
+            }
         }
     }
 }
