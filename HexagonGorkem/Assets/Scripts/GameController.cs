@@ -61,7 +61,11 @@ public class GameController : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        TileParent.transform.localScale = new Vector3(TileScale,TileScale,TileScale); //Altıgenlerin boyutunu ayarla
+        //Altıgenlerin boyutunu "TileScale" değerine eşle
+        for (var k = 0; k < TileParent.transform.childCount; k++) {
+            TileParent.transform.GetChild(k).localScale = new Vector3(TileScale,TileScale,TileScale);
+        }
+
         GameGrid = new GameGridList[GridSize.x,GridSize.y]; //Altıgenlerle ilgili gerekli her bilgiyi tutan arrayin boyutunu belirle
         CreateField(); //Alandaki altıgenleri yarat
         previousTileScale = TileScale;
@@ -334,7 +338,6 @@ public class GameController : MonoBehaviour
             if (ColorMatchDetection()) {
                 DestroyTiles();
                 Moves++;
-                BombCountdown();
             }
             else { //Eşleşme yok, son bir kez daha döndür
                 yield return new WaitForSeconds(0.1f);
@@ -344,12 +347,9 @@ public class GameController : MonoBehaviour
                 if (ColorMatchDetection()) {
                     DestroyTiles();
                     Moves++;
-                    BombCountdown();
                 }
                 else {
                     Swipe = false; //Hala eşleşme yoksa, oyuncunun swipe yapabilme iznini tekrar aç
-                    BombCountdown(); //Bombaların sayacını çalıştır
-                    AnyMovesLeft(); //Yapılabilecek hareket kaldı mı?
                 }
             }
         }
@@ -566,7 +566,7 @@ public class GameController : MonoBehaviour
             GameObject bomb = Instantiate(BombUIObject,tileObj.transform.position,Quaternion.identity,tileObj.transform);
             Text bombText = bomb.transform.GetChild(0).GetComponent<Text>();
             bombText.text = BombCountdownMax.ToString();
-            Bombs.Add(new BombList(new Vector2Int(pointX,pointY),BombCountdownMax,bombText)); //Bombanın grid pozisyonu ve sayacını listeye ekle
+            Bombs.Add(new BombList(new Vector2Int(pointX,pointY),BombCountdownMax,bombText,true)); //Bombanın grid pozisyonu ve sayacını listeye ekle
         }
         else if (starRnd < StarPercent) {
             _tileType = "Star";
@@ -583,9 +583,11 @@ public class GameController : MonoBehaviour
     void ScaleTiles()
     {
         if (TileScale != previousTileScale) {
-            TileParent.transform.localScale = new Vector3(TileScale,TileScale,TileScale);
-            previousTileScale = TileScale;
+            for (var k = 0; k < TileParent.transform.childCount; k++) {
+                TileParent.transform.GetChild(k).localScale = new Vector3(TileScale,TileScale,TileScale);
+            }
         }
+        previousTileScale = TileScale;
     }
 
 
@@ -602,16 +604,18 @@ public class GameController : MonoBehaviour
     }
 
     //Bomba varsa geri sayımı çalıştır
-    void BombCountdown ()
+    void BombCountdown()
     {
         if (Bombs.Count != 0) {
             for(var c = 0; c < Bombs.Count; c++) {
-                if (Bombs[c].BombCountdown > 0) {
+                if (Bombs[c].IsBombNew) { //Eğer bomba yeni yaratılmışsa, bir turluğuna sayacını değiştirme
+                    Bombs [c].IsBombNew = false;
+                }
+                else if (Bombs[c].BombCountdown > 0) {
                     Bombs [c].BombText.text = (--Bombs [c].BombCountdown).ToString();
                     if (Bombs[c].BombCountdown == 0) { //Bombanın sayacı biterse oyunu bitir
                         GameOver();
                     }
-                    //Debug.Log(Bombs [c].BombCountdown);
                 }
             }
         }
@@ -625,6 +629,8 @@ public class GameController : MonoBehaviour
                 boolPos = (i % 2 == 0); //Altıgenler her iki yatay birimde bir, dikeyde aşağı kayıyor
                 if ((i != 0 && j != GridSize.y-1) || (!boolPos && j == GridSize.y-1)) {
                     if (GameGrid[i,j].TileColor == GameGrid[i - 1,j + (boolPos ? 1 : 0)].TileColor) { //Sol üstündeki ile aynı renk mi?
+
+                        //Burada yapılabilecek hamlelerin sonucunu kontrol ediyor. True olarak dönerse oyuncunun yapabileceği bir hamle vardır.
                         if (MoveCheck(i,j,-2,0)) return true;
                         if (MoveCheck(i,j,-2,-1)) return true;
                         if (MoveCheck(i,j,-1,-2 + (boolPos ? 1 : 0))) return true;
@@ -638,6 +644,8 @@ public class GameController : MonoBehaviour
                 }
                 if (j != GridSize.y - 1) {
                     if (GameGrid [i,j].TileColor == GameGrid [i,j + 1].TileColor) { //Bir üstündeki ile aynı renk mi?
+
+                        //Burada yapılabilecek hamlelerin sonucunu kontrol ediyor. True olarak dönerse oyuncunun yapabileceği bir hamle vardır.
                         if (MoveCheck(i,j,-1,1 + (boolPos ? 0 : 0))) return true;
                         if (MoveCheck(i,j,-2,1)) return true;
                         if (MoveCheck(i,j,-2,0)) return true;
@@ -651,6 +659,8 @@ public class GameController : MonoBehaviour
                 }
                 if (i != GridSize.x-1 && (j != GridSize.y-1 || (!boolPos && j == GridSize.y-1))) {
                     if (GameGrid[i,j].TileColor == GameGrid[i + 1,j + (boolPos ? 1 : 0)].TileColor) { //Sağ üstündeki ile aynı renk mi?
+                        
+                        //Burada yapılabilecek hamlelerin sonucunu kontrol ediyor. True olarak dönerse oyuncunun yapabileceği bir hamle vardır.
                         if (MoveCheck(i,j,-1,1 + (boolPos ? 0 : -1))) return true;
                         if (MoveCheck(i,j,-1,2 + (boolPos ? 0 : -1))) return true;
                         if (MoveCheck(i,j,0,2)) return true;
@@ -668,6 +678,7 @@ public class GameController : MonoBehaviour
         return false;
     }
 
+    //AnyMovesLeft() tarafından çağrılan, spesifik olarak iki pozisyonun renklerinin uyuşup uyuşmadığına bakan fonksiyon
     bool MoveCheck(int i, int j, int newX, int newY)
     {
         if (i + newX >= 0 && i + newX < GridSize.x && j + newY >= 0 && j + newY < GridSize.y) {
