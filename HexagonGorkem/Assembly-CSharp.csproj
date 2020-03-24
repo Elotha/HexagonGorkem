@@ -66,6 +66,7 @@
     <Compile Include="Assets\Scripts\BombList.cs" />
     <Compile Include="Assets\Scripts\GameController.cs" />
     <Compile Include="Assets\Scripts\GameGridList.cs" />
+    <Compile Include="Assets\Scripts\GameOverButton.cs" />
     <Compile Include="Assets\Scripts\MiddlePointsList.cs" />
     <Compile Include="Assets\Scripts\TilePosition.cs" />
     <Reference Include="Unity.Timeline.Editor">

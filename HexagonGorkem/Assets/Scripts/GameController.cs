@@ -12,7 +12,7 @@ public class GameController : MonoBehaviour
     [SerializeField] private Transform TileParent; //Altıgenlerin parent objesi
     [SerializeField] private GameObject Particle; //Particle efektinin objesi
     [SerializeField] private Transform ParticleParent; //Particle efekti için parent obje
-    [SerializeField] private Transform TileEdge; //Altıgenler seçildiğinde çıkan outline objesi
+    [SerializeField] private Transform TileOutline; //Altıgenler seçildiğinde çıkan outline objesi
     [SerializeField] private float TileScale = 1f; //Altıgenlerin büyüklüğü
     [SerializeField] private float Gap = 0.65f; //Altıgenlerin arasındaki boşluk miktarı
     [SerializeField] private float VerticalAdjusment = 1f; //Oyun sahası ekranın ne kadar altında
@@ -25,7 +25,7 @@ public class GameController : MonoBehaviour
     [SerializeField] private int StarPercent = 8; //Yıldızlı altıgenin çıkmasının yüzde ihtimali
     [SerializeField] private Sprite StarSprite; //Yıldızlı altıgenin görseli
     [SerializeField] private Sprite BombSprite; //Bombalı altıgenin görseli
-    [SerializeField] private GameObject CanvasObject; //Bombanın UI objesi
+    [SerializeField] private GameObject BombUIObject; //Bombanın UI objesi
     [SerializeField] private GameObject ScoreObject; //Skorun UI objesi
     [SerializeField] private GameObject MovesObject; //"MovesText" objesi
     [SerializeField] private int BombCountdownMax = 10; //Bomba için geri sayımın başladığı sayı
@@ -50,6 +50,8 @@ public class GameController : MonoBehaviour
     private bool Swipe = false; //Swipe yapabilme iznini kontrol eden değer
 
     //Diğer değerler
+    [SerializeField] private GameObject GameOverObject; //Game over ekranı için UI objesi
+    [SerializeField] private Transform CanvasObject; //Canvas UI parent objesi
     private Vector3 StartPosition; //Gridin başladığı dünya koordinatları
     private float previousTileScale; //Altıgenlerin boyutunu oyun sırasında ayarlayabilmek için gereken bir değer
     private float debugWaitingTime = 0.05f; //Debug amaçlı olarak altıgenlerin düşmesi ve yenilerinin yaratılmasının bekleme miktarı
@@ -121,7 +123,7 @@ public class GameController : MonoBehaviour
                 //Burada, köşelerde olmayan her altıgen için iki adet kesişme belirliyor. Köşeler için ise birer tane belirliyor.
                 //Bu şekilde griddeki her satır için (altıgen sayısı . 2 + 2) kadar kesişme noktası belirlenmiş oluyor.
                 //MiddlePointsList, kesişme noktasının oyun koordinatlarını, etrafındaki üç altıgenin grid koordinatlarını ve
-                //seçim sırasında "TileEdge" objesinin 60 derece dönmesinin gerekip gerekmeyeceğini tutar.
+                //seçim sırasında "TileOutline" objesinin 60 derece dönmesinin gerekip gerekmeyeceğini tutar.
                 if (i != 0 && j != GridSize.y-1) {
                     _middlePoint = GetMiddlePoint(GetWorldPosition(i,j),GetWorldPosition(i,j + 1),GetWorldPosition(i - 1,j + (boolPos ? 1 : 0)));
                     MiddlePoints.Add(new MiddlePointsList(_middlePoint,new Vector2Int(i,j),new Vector2Int(i,j + 1),new Vector2Int(i - 1,j + (boolPos ? 1 : 0)),true));
@@ -142,6 +144,15 @@ public class GameController : MonoBehaviour
                 GameGrid [ColorMatchPoints [h].x,ColorMatchPoints [h].y].TileColor = col;
                 GameGrid [ColorMatchPoints [h].x,ColorMatchPoints [h].y].TileObject.GetComponent<SpriteRenderer>().color = col;
             }
+        }
+
+        //Yapılabilecek hiçbir hamle yoksa sahneyi yenile
+        if (!AnyMovesLeft()) {
+            Debug.Log("Oyun başarısız başladı, yenileniyor.");
+            for(var q = 0; q < TileParent.childCount; q++) {
+                Destroy(TileParent.GetChild(q).gameObject);
+            }
+            CreateField();
         }
     }
     
@@ -238,8 +249,8 @@ public class GameController : MonoBehaviour
                             }
                         }
                         else {
-                            //Yeni "TileEdge" objesini yarat ve üçlü kesişmedeki her bir grid pozisyonunu SelectedTiles arrayinde tut
-                            Selection = Instantiate(TileEdge,new Vector3(MiddlePoints [MP].PointPosition.x,MiddlePoints [MP].PointPosition.y,-2),GetSelectionType(MP)).gameObject;
+                            //Yeni "TileOutline" objesini yarat ve üçlü kesişmedeki her bir grid pozisyonunu SelectedTiles arrayinde tut
+                            Selection = Instantiate(TileOutline,new Vector3(MiddlePoints [MP].PointPosition.x,MiddlePoints [MP].PointPosition.y,-2),GetSelectionType(MP)).gameObject;
                         }
                         Selection.transform.position = new Vector3(MiddlePoints [MP].PointPosition.x,MiddlePoints [MP].PointPosition.y,-2);
                         Selection.transform.rotation = GetSelectionType(MP);
@@ -262,7 +273,7 @@ public class GameController : MonoBehaviour
                             if (Selection != null) {
                                 Destroy(Selection);
                             }
-                            Selection = Instantiate(TileEdge,new Vector3(MiddlePoints [MP].PointPosition.x,MiddlePoints [MP].PointPosition.y,-2),GetSelectionType(MP)).gameObject;
+                            Selection = Instantiate(TileOutline,new Vector3(MiddlePoints [MP].PointPosition.x,MiddlePoints [MP].PointPosition.y,-2),GetSelectionType(MP)).gameObject;
                             SelectedTiles [0] = MiddlePoints [MP].GridPositions [0];
                             SelectedTiles [1] = MiddlePoints [MP].GridPositions [1];
                             SelectedTiles [2] = MiddlePoints [MP].GridPositions [2];
@@ -296,7 +307,7 @@ public class GameController : MonoBehaviour
         return Result;
     }
 
-    //Üçlü kesişme noktasına göre "TileEdge" objesi 60 derece dönmüş olarak mı yaratılmalı, yoksa 0 derece olarak mı?
+    //Üçlü kesişme noktasına göre "TileOutline" objesi 60 derece dönmüş olarak mı yaratılmalı, yoksa 0 derece olarak mı?
     Quaternion GetSelectionType(int MP)
     {
         return ((MiddlePoints [MP].Rotate) ? Quaternion.Euler(new Vector3(0,0,60)) : Quaternion.identity);
@@ -313,7 +324,6 @@ public class GameController : MonoBehaviour
         if (ColorMatchDetection()) {
             DestroyTiles();
             Moves++;
-            BombCountdown();
         }
         else { //Eşleşme yok, bir kez daha döndür
             yield return new WaitForSeconds(0.1f);
@@ -336,10 +346,40 @@ public class GameController : MonoBehaviour
                     Moves++;
                     BombCountdown();
                 }
-                else Swipe = false; //Hala eşleşme yoksa, oyuncunun swipe yapabilme iznini tekrar aç
+                else {
+                    Swipe = false; //Hala eşleşme yoksa, oyuncunun swipe yapabilme iznini tekrar aç
+                    BombCountdown(); //Bombaların sayacını çalıştır
+                    AnyMovesLeft(); //Yapılabilecek hareket kaldı mı?
+                }
             }
         }
         MovesText.text = Moves.ToString();
+    }
+    
+    //Seçilen altıgenleri döndüren fonksiyon
+    IEnumerator Rotation(int sign)
+    {
+        float time = 0f;
+        float TotalAngle = 0f;
+        float targetAngle = -120f * sign;
+        while (time <= 1f) {
+            time += Time.deltaTime / RotationTime;
+            float Ang = Mathf.Lerp(0f,targetAngle,Time.deltaTime / RotationTime);
+            if (Mathf.Abs(TotalAngle+Ang) > Mathf.Abs(targetAngle)) {
+                Ang = targetAngle - TotalAngle;
+            }
+            TotalAngle += Ang;
+            for(var s = 0; s < SelectedTileObjects.Length; s++) {
+                SelectedTileObjects[s].transform.RotateAround(Selection.transform.position, Vector3.back, Ang);
+                if (SelectedTileObjects[s].transform.childCount > 0) { //Altıgen bomba taşıyorsa, bombanın sayacını döndürme
+                    Vector3 rot = SelectedTileObjects [s].transform.rotation.eulerAngles;
+                    SelectedTileObjects [s].transform.GetChild(0).GetChild(0).localRotation = Quaternion.Euler(new Vector3(0,0,0-rot.z));
+                }
+
+            }
+            Selection.transform.Rotate(new Vector3(0f,0f,-Ang));
+            yield return null;
+        }
     }
 
     //Seçilen üç altıgenin bilgierini takas eden fonksiyon
@@ -381,28 +421,6 @@ public class GameController : MonoBehaviour
         }
 
     }
-
-    //Seçilen altıgenleri döndüren fonksiyon
-    IEnumerator Rotation(int sign)
-    {
-        float time = 0f;
-        float TotalAngle = 0f;
-        float targetAngle = -120f * sign;
-        while (time <= 1f) {
-            time += Time.deltaTime / RotationTime;
-            float Ang = Mathf.Lerp(0f,targetAngle,Time.deltaTime / RotationTime);
-            if (Mathf.Abs(TotalAngle+Ang) > Mathf.Abs(targetAngle)) {
-                Ang = targetAngle - TotalAngle;
-            }
-            TotalAngle += Ang;
-            for(var s = 0; s < SelectedTileObjects.Length; s++) {
-                SelectedTileObjects[s].transform.RotateAround(Selection.transform.position, Vector3.back, Ang);
-            }
-            Selection.transform.Rotate(new Vector3(0f,0f,-Ang));
-            yield return null;
-        }
-    }
-
 
     //Renk eşleşmesi olduğunda eşleşen altıgenleri yok eden fonksiyon
     void DestroyTiles()
@@ -510,6 +528,8 @@ public class GameController : MonoBehaviour
         if (!ColorMatchDetection()) {
             SelectTileObjects(); //Yeri değişen ve yeni yaratılan altıgenler, yeni bir eşleşme yarattı mı?
             Swipe = false; //Her şey bittiğinde oyuncuya tekrar swipe yapabilme hakkını ver
+            BombCountdown(); //Bombaların sayacını çalıştır
+            AnyMovesLeft(); //Yapılabilecek hareket kaldı mı?
         }
         else {
             DestroyTiles(); //Tekrar eşleşme varsa eşleşen altıgenleri yok et
@@ -543,8 +563,9 @@ public class GameController : MonoBehaviour
             BombCount++;
             _tileType = "Bomb";
             tileObj.GetComponent<SpriteRenderer>().sprite = BombSprite;
-            GameObject bomb = Instantiate(CanvasObject,tileObj.transform.position,Quaternion.identity,tileObj.transform);
+            GameObject bomb = Instantiate(BombUIObject,tileObj.transform.position,Quaternion.identity,tileObj.transform);
             Text bombText = bomb.transform.GetChild(0).GetComponent<Text>();
+            bombText.text = BombCountdownMax.ToString();
             Bombs.Add(new BombList(new Vector2Int(pointX,pointY),BombCountdownMax,bombText)); //Bombanın grid pozisyonu ve sayacını listeye ekle
         }
         else if (starRnd < StarPercent) {
@@ -596,10 +617,72 @@ public class GameController : MonoBehaviour
         }
     }
 
+    bool AnyMovesLeft()
+    {
+        bool boolPos;
+        for (var j = 0; j < GridSize.y; j++) {
+            for (var i = 0; i < GridSize.x; i++) {
+                boolPos = (i % 2 == 0); //Altıgenler her iki yatay birimde bir, dikeyde aşağı kayıyor
+                if ((i != 0 && j != GridSize.y-1) || (!boolPos && j == GridSize.y-1)) {
+                    if (GameGrid[i,j].TileColor == GameGrid[i - 1,j + (boolPos ? 1 : 0)].TileColor) { //Sol üstündeki ile aynı renk mi?
+                        if (MoveCheck(i,j,-2,0)) return true;
+                        if (MoveCheck(i,j,-2,-1)) return true;
+                        if (MoveCheck(i,j,-1,-2 + (boolPos ? 1 : 0))) return true;
+                        if (MoveCheck(i,j,0,-1)) return true;
+
+                        if (MoveCheck(i,j,-1,1 + (boolPos ? 1 : 0))) return true;
+                        if (MoveCheck(i,j,0,+2)) return true;
+                        if (MoveCheck(i,j,1,1 + (boolPos ? 1 : 0))) return true;
+                        if (MoveCheck(i,j,1,(boolPos ? 1 : 0))) return true;
+                    }
+                }
+                if (j != GridSize.y - 1) {
+                    if (GameGrid [i,j].TileColor == GameGrid [i,j + 1].TileColor) { //Bir üstündeki ile aynı renk mi?
+                        if (MoveCheck(i,j,-1,1 + (boolPos ? 0 : 0))) return true;
+                        if (MoveCheck(i,j,-2,1)) return true;
+                        if (MoveCheck(i,j,-2,0)) return true;
+                        if (MoveCheck(i,j,-1,(boolPos ? 0 : -1))) return true;
+
+                        if (MoveCheck(i,j,1,1 + (boolPos ? 1 : 0))) return true;
+                        if (MoveCheck(i,j,2,1)) return true;
+                        if (MoveCheck(i,j,2,0)) return true;
+                        if (MoveCheck(i,j,1,(boolPos ? 0 : -1))) return true;
+                    }
+                }
+                if (i != GridSize.x-1 && (j != GridSize.y-1 || (!boolPos && j == GridSize.y-1))) {
+                    if (GameGrid[i,j].TileColor == GameGrid[i + 1,j + (boolPos ? 1 : 0)].TileColor) { //Sağ üstündeki ile aynı renk mi?
+                        if (MoveCheck(i,j,-1,1 + (boolPos ? 0 : -1))) return true;
+                        if (MoveCheck(i,j,-1,2 + (boolPos ? 0 : -1))) return true;
+                        if (MoveCheck(i,j,0,2)) return true;
+                        if (MoveCheck(i,j,1,2 + (boolPos ? 0 : -1))) return true;
+
+                        if (MoveCheck(i,j,0,-1)) return true;
+                        if (MoveCheck(i,j,1,-1 + (boolPos ? 0 : -1))) return true;
+                        if (MoveCheck(i,j,2,-1)) return true;
+                        if (MoveCheck(i,j,2,0)) return true;
+                    }
+                }
+            }
+        }
+        Debug.Log("No moves left!");
+        return false;
+    }
+
+    bool MoveCheck(int i, int j, int newX, int newY)
+    {
+        if (i + newX >= 0 && i + newX < GridSize.x && j + newY >= 0 && j + newY < GridSize.y) {
+            if (GameGrid[i,j].TileColor == GameGrid[i + newX,j + newY].TileColor) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     //Oyunu bitiren fonksiyon
     void GameOver()
     {
-
+        MovementPermission = false;
+        Instantiate(GameOverObject,CanvasObject.position,Quaternion.identity,CanvasObject);
     }
 
     //Üçlü seçimdeki objeleri SelectedTileObjects arrayine koy / yenile
