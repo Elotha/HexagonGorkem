@@ -246,8 +246,6 @@ MonoBehaviour:
   VerticalAdjusment: 1
   AllowedDistance: 0.65
   RotationTime: 0.3
-  Score: 0
-  Moves: 0
   StarPercent: 8
   StarSprite: {fileID: 21300000, guid: 5b3979d22aaa0f441a64e2e75510abf9, type: 3}
   BombSprite: {fileID: 21300000, guid: 651899fd00fb9e943b3ea2c3b4e843f6, type: 3}
@@ -255,12 +253,12 @@ MonoBehaviour:
     type: 3}
   ScoreObject: {fileID: 920050706}
   MovesObject: {fileID: 29259013}
-  BombCountdownMax: 5
-  BombMinimumScore: 1000
-  MinimumAngle: 30
   GameOverObject: {fileID: 8153894186157972631, guid: 4feb78551870e94449f7dc42fdbdebe5,
     type: 3}
   CanvasObject: {fileID: 191439104}
+  BombCountdownMax: 5
+  BombMinimumScore: 1000
+  MinimumAngle: 30
 --- !u!4 &188678804
 Transform:
   m_ObjectHideFlags: 0

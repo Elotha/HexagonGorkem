@@ -13,9 +13,9 @@ public class GameController : MonoBehaviour
     [SerializeField] private GameObject Particle; //Particle efektinin objesi
     [SerializeField] private Transform ParticleParent; //Particle efekti için parent obje
     [SerializeField] private Transform TileOutline; //Altıgenler seçildiğinde çıkan outline objesi
-    [SerializeField] private float TileScale = 1f; //Altıgenlerin büyüklüğü
+    [SerializeField] private float TileScale = 1.2f; //Altıgenlerin büyüklüğü
     [SerializeField] private float Gap = 0.65f; //Altıgenlerin arasındaki boşluk miktarı
-    [SerializeField] private float VerticalAdjusment = 1f; //Oyun sahası ekranın ne kadar altında
+    [SerializeField] private float VerticalAdjusment = 1f; //Oyun sahası ekranda ne kadar aşağı ötelenecek
     [SerializeField] private float AllowedDistance = 0.8f; //Altıgenleri seçebilmek için oyuncunun basabileceği maksimum uzaklık
     [SerializeField] private float RotationTime = 0.3f; //Altıgenlerin bir defalık dönme süresi
 
@@ -26,18 +26,20 @@ public class GameController : MonoBehaviour
     [SerializeField] private GameObject BombUIObject; //Bombanın UI objesi
     [SerializeField] private GameObject ScoreObject; //Skorun UI objesi
     [SerializeField] private GameObject MovesObject; //"MovesText" objesi
+    [SerializeField] private GameObject GameOverObject; //Game over ekranı için UI objesi
+    [SerializeField] private Transform CanvasObject; //Canvas UI parent objesi
     [SerializeField] private int BombCountdownMax = 5; //Bomba için geri sayımın başladığı sayı
     [SerializeField] private int BombMinimumScore = 1000; //Bomba için gerekli skor miktarı
     private int Score = 0; //Oyuncunun skoru
     private int Moves = 0; //Oyuncunun yaptığı toplam hareket sayısı
     private List<BombList> Bombs = new List<BombList>(); //Bombaların pozisyon ve sayaçlarını tutan liste
-    private int BombCount = 0; //Oyun boyunca yaratılan bomba sayısı
+    private int BombCount = 0; //Oyun boyunca yaratılan toplam bomba sayısı
     private Text ScoreText; //Skor texti
     private Text MovesText; //Moves sayısı
 
     //Altıgenlerin ve üçlü keşismelerin noktaları, seçim objesi, seçilen objeler, renk eşleşmeleri
     private GameGridList [,] GameGrid; //Altıgenler ile ilgili gerekli tüm bilgileri tutan grid arrayi
-    private List<MiddlePointsList> MiddlePoints = new List<MiddlePointsList>(); //Altıgenlerin üçlü olarak seçilebildiği her nokta
+    private List<MiddlePointsList> MiddlePoints = new List<MiddlePointsList>(); //Altıgenlerin üçlü olarak seçilebildiği her noktanın listesi
     private GameObject Selection = null; //Altıgenleri seçen outline objesi
     private Vector2Int [] SelectedTiles = new Vector2Int [3]; //Hangi üç grid pozisyonunun seçili olduğunu tutan array
     private GameObject [] SelectedTileObjects = new GameObject [3]; //Hangi üç objenin seçili olduğunu tutan array
@@ -50,22 +52,21 @@ public class GameController : MonoBehaviour
     private bool Swipe = false; //Swipe yapabilme iznini kontrol eden değer
 
     //Diğer değerler
-    [SerializeField] private GameObject GameOverObject; //Game over ekranı için UI objesi
-    [SerializeField] private Transform CanvasObject; //Canvas UI parent objesi
     private Vector3 StartPosition; //Gridin başladığı dünya koordinatları
     private float previousTileScale; //Altıgenlerin boyutunu oyun sırasında ayarlayabilmek için gereken bir değer
-    private float debugWaitingTime = 0.05f; //Debug amaçlı olarak altıgenlerin düşmesi ve yenilerinin yaratılmasının bekleme miktarı
+    private float WaitingTime = 0.05f; //Altıgenlerin düşmesi ve yenilerinin yaratılmasının bekleme miktarı
 
     void Start()
     {
+        GameGrid = new GameGridList[GridSize.x,GridSize.y]; //Altıgenlerle ilgili gerekli her bilgiyi tutan arrayin boyutunu belirle
+        CreateField(); //Alandaki altıgenleri yarat
+
         //Altıgenlerin boyutunu "TileScale" değerine eşle
         for (var k = 0; k < TileParent.transform.childCount; k++) {
             TileParent.transform.GetChild(k).localScale = new Vector3(TileScale,TileScale,TileScale);
         }
-
-        GameGrid = new GameGridList[GridSize.x,GridSize.y]; //Altıgenlerle ilgili gerekli her bilgiyi tutan arrayin boyutunu belirle
-        CreateField(); //Alandaki altıgenleri yarat
         previousTileScale = TileScale;
+
         ScoreText = ScoreObject.GetComponent<Text>();
         MovesText = MovesObject.GetComponent<Text>();
     }
@@ -74,7 +75,7 @@ public class GameController : MonoBehaviour
     void Update()
     {
         HandleInput();
-        ScaleTiles();
+        if (Application.isEditor) ScaleTiles(); //Sadece Editor modundayken "TileScale" değerinin değişmesi, altıgenleri etkiler.
     }
 
     //Alanı yaratan fonksiyon
@@ -100,7 +101,9 @@ public class GameController : MonoBehaviour
                 boolPos = (i % 2 == 0); //Altıgenler her iki yatay birimde bir, dikeyde aşağı kayıyor
                 Vector3 TilePos = StartPosition + new Vector3(i * Mathf.Cos(Mathf.Deg2Rad * 30) * Gap,j * Gap + (boolPos ? Gap * Mathf.Sin(Mathf.Deg2Rad * 30) : 0));
                 tileObj = Instantiate(Tile,TilePos,Quaternion.identity,TileParent) as GameObject;
-                tileObj.GetComponent<TilePosition>().TilePositionVector = new Vector2Int(i,j); //Editörden altıgenlerin pozisyonu görünebilsin
+
+                //Editörden altıgenlerin pozisyonu görünebilsin
+                if (Application.isEditor) tileObj.GetComponent<TilePosition>().TilePositionVector = new Vector2Int(i,j); 
 
                 //Rastgele bir renk belirle, yıldız olma ihtimalini belirle, ardından atamaları yap
                 rnd = Random.Range(0,TileColors.Length);
@@ -155,6 +158,57 @@ public class GameController : MonoBehaviour
             }
             CreateField();
         }
+
+    }
+
+    //Oyuncu etkileşimi ile ilgili her şeyi halleden fonksiyon
+    void HandleInput() {
+        if (MovementPermission) { //Oyun alanı ile etkileşime girme iznimiz varsa
+            if (Selection != null && !Swipe) { //Üçlü bir seçim varsa ve oyuncunun swipe yapma izni varsa
+                if (Input.GetMouseButtonDown(0)) {
+                    //Oyuncunun bastığı ilk pozisyonu al
+                    InputStartPos = Camera.main.ScreenToWorldPoint(new Vector3(Input.mousePosition.x,Input.mousePosition.y),0) - Selection.transform.position;
+                }
+
+                if (Input.GetMouseButton(0)) {
+                    //Oyuncunun basılı tutuyorsa, bastığı yerin koordinatlarını al
+                    InputLastPos = Camera.main.ScreenToWorldPoint(new Vector3(Input.mousePosition.x,Input.mousePosition.y),0) - Selection.transform.position;
+                    if (InputLastPos != InputStartPos) { //Oyuncu parmağını ilerletti
+                        if (Vector2.Angle(InputStartPos,InputLastPos) > MinimumAngle) { //Bastığı ilk nokta ve son nokta arasında yeterli swipe açısı oluştu mu?
+                            Swipe = true;
+                            StartCoroutine(RotateSelection(Mathf.FloorToInt(Mathf.Sign(Vector2.SignedAngle(InputStartPos,InputLastPos))))); //Seçimi döndürme fonksiyonu
+                        }
+                    }
+                }
+            }
+            
+            if (Input.GetMouseButtonUp(0)) { //Oyuncu parmağını kaldırdıysa
+                if (!Swipe) { 
+                    int MP = MinimumDistance(); //Üçlü kesişme noktalarından en yakını hangisi, onun liste indexini al
+                    if (MP != -1) {
+                        if (Selection != null) {
+                            //Seçilen altıgenlerin derinliğini ve rotasyonlarını sıfırla
+                            Vector3 Pos;
+                            for (var s = 0; s < SelectedTileObjects.Length; s++) {
+                                Pos = SelectedTileObjects [s].transform.position;
+                                SelectedTileObjects [s].transform.position = new Vector3(Pos.x,Pos.y,0f);
+                                //SelectedTileObjects [s].transform.localRotation = Quaternion.identity;
+                            }
+                        }
+                        else {
+                            //Yeni "TileOutline" objesini yarat ve üçlü kesişmedeki her bir grid pozisyonunu SelectedTiles arrayinde tut
+                            Selection = Instantiate(TileOutline,new Vector3(MiddlePoints [MP].PointPosition.x,MiddlePoints [MP].PointPosition.y,-2),GetSelectionType(MP)).gameObject;
+                        }
+                        Selection.transform.position = new Vector3(MiddlePoints [MP].PointPosition.x,MiddlePoints [MP].PointPosition.y,-2);
+                        Selection.transform.rotation = GetSelectionType(MP);
+                        SelectedTiles [0] = MiddlePoints [MP].GridPositions [0];
+                        SelectedTiles [1] = MiddlePoints [MP].GridPositions [1];
+                        SelectedTiles [2] = MiddlePoints [MP].GridPositions [2];
+                        SelectTileObjects();
+                    }
+                }
+            }
+        }
     }
     
     //Grid içerisindeki pozisyonu bilinen bir altıgenin oyun içerisindeki koordinatlarını bul
@@ -199,96 +253,6 @@ public class GameController : MonoBehaviour
         else return true;
     }
 
-    //Oyuncu etkileşimi ile ilgili her şeyi halleden fonksiyon
-    void HandleInput() {
-        if (MovementPermission) { //Oyun alanı ile etkileşime girme iznimiz varsa
-            if (Selection != null && !Swipe) { //Üçlü bir seçim varsa ve oyuncunun swipe yapma izni varsa
-                if (Input.GetMouseButtonDown(0)) {
-                    //Oyuncunun bastığı ilk pozisyonu al
-                    InputStartPos = Camera.main.ScreenToWorldPoint(new Vector3(Input.mousePosition.x,Input.mousePosition.y),0) - Selection.transform.position;
-                }
-
-                if (Input.GetMouseButton(0)) {
-                    //Oyuncunun basılı tutuyorsa, bastığı yerin koordinatlarını al
-                    InputLastPos = Camera.main.ScreenToWorldPoint(new Vector3(Input.mousePosition.x,Input.mousePosition.y),0) - Selection.transform.position;
-                    if (InputLastPos != InputStartPos) { //Oyuncu parmağını ilerletti
-                        if (Vector2.Angle(InputStartPos,InputLastPos) > MinimumAngle) { //Bastığı ilk nokta ve son nokta arasında yeterli swipe açısı oluştu mu?
-                            Swipe = true; 
-                            StartCoroutine(RotateSelection(Mathf.FloorToInt(Mathf.Sign(Vector2.SignedAngle(InputStartPos,InputLastPos))))); //Seçimi döndürme fonksiyonu
-                        }
-                    }
-                }
-
-                /*if (Input.touchCount > 0) {
-                    Touch touch = Input.GetTouch(0);
-                    if (touch.phase == TouchPhase.Began) {
-                        InputStartPos = Camera.main.ScreenToWorldPoint(new Vector3(Input.mousePosition.x,Input.mousePosition.y),0) - Selection.transform.position;
-                    }
-                    else if (touch.phase == TouchPhase.Moved) {
-                        InputLastPos = Camera.main.ScreenToWorldPoint(new Vector3(Input.mousePosition.x,Input.mousePosition.y),0) - Selection.transform.position;
-                        if (InputLastPos != InputStartPos) {
-                            if (Vector2.Angle(InputStartPos,InputLastPos) > MinimumAngle) {
-                                Swipe = true;
-                                StartCoroutine(RotateSelection(Mathf.FloorToInt(Mathf.Sign(Vector2.SignedAngle(InputStartPos,InputLastPos)))));
-                            }
-                        }
-                    }
-                }*/
-            }
-            
-            if (Input.GetMouseButtonUp(0)) { //Oyuncu parmağını kaldırdıysa
-                if (!Swipe) { 
-                    int MP = MinimumDistance(); //Üçlü kesişme noktalarından en yakını hangisi, onun liste indexini al
-                    if (MP != -1) {
-                        if (Selection != null) {
-                            //Seçilen altıgenlerin derinliğini ve rotasyonlarını sıfırla
-                            Vector3 Pos;
-                            for (var s = 0; s < SelectedTileObjects.Length; s++) {
-                                Pos = SelectedTileObjects [s].transform.position;
-                                SelectedTileObjects [s].transform.position = new Vector3(Pos.x,Pos.y,0f);
-                                //SelectedTileObjects [s].transform.localRotation = Quaternion.identity;
-                            }
-                        }
-                        else {
-                            //Yeni "TileOutline" objesini yarat ve üçlü kesişmedeki her bir grid pozisyonunu SelectedTiles arrayinde tut
-                            Selection = Instantiate(TileOutline,new Vector3(MiddlePoints [MP].PointPosition.x,MiddlePoints [MP].PointPosition.y,-2),GetSelectionType(MP)).gameObject;
-                        }
-                        Selection.transform.position = new Vector3(MiddlePoints [MP].PointPosition.x,MiddlePoints [MP].PointPosition.y,-2);
-                        Selection.transform.rotation = GetSelectionType(MP);
-                        SelectedTiles [0] = MiddlePoints [MP].GridPositions [0];
-                        SelectedTiles [1] = MiddlePoints [MP].GridPositions [1];
-                        SelectedTiles [2] = MiddlePoints [MP].GridPositions [2];
-                        SelectTileObjects();
-                        //Debug.Log("Tile0: " + SelectedTiles [0]);
-                        //Debug.Log("Tile1: " + SelectedTiles [1]);
-                        //Debug.Log("Tile2: " + SelectedTiles [2]);
-                    }
-                }
-            }
-            /*if (Input.touchCount > 0) {
-                Touch touch = Input.GetTouch(0);
-                if (touch.phase == TouchPhase.Ended) {
-                    if (!Swipe) { 
-                        int MP = MinimumDistance();
-                        if (MP != -1) {
-                            if (Selection != null) {
-                                Destroy(Selection);
-                            }
-                            Selection = Instantiate(TileOutline,new Vector3(MiddlePoints [MP].PointPosition.x,MiddlePoints [MP].PointPosition.y,-2),GetSelectionType(MP)).gameObject;
-                            SelectedTiles [0] = MiddlePoints [MP].GridPositions [0];
-                            SelectedTiles [1] = MiddlePoints [MP].GridPositions [1];
-                            SelectedTiles [2] = MiddlePoints [MP].GridPositions [2];
-                            SelectTileObjects();
-                            //Debug.Log("Tile0: " + SelectedTiles [0]);
-                            //Debug.Log("Tile1: " + SelectedTiles [1]);
-                            //Debug.Log("Tile2: " + SelectedTiles [2]);
-                        }
-                    }
-                }
-            }*/
-        }
-    }
-
     //Üçlü kesişme noktalarından en yakını hangisi, onun liste indexini al
     int MinimumDistance ()
     {
@@ -312,6 +276,16 @@ public class GameController : MonoBehaviour
     Quaternion GetSelectionType(int MP)
     {
         return ((MiddlePoints [MP].Rotate) ? Quaternion.Euler(new Vector3(0,0,60)) : Quaternion.identity);
+    }
+    
+    //Üçlü seçimdeki objeleri SelectedTileObjects arrayine koy / yenile
+    void SelectTileObjects()
+    {
+        for (var s = 0; s < SelectedTiles.Length; s++) {
+            SelectedTileObjects [s] = GameGrid [SelectedTiles [s].x,SelectedTiles [s].y].TileObject;
+            var Pos = SelectedTileObjects [s].transform.position;
+            SelectedTileObjects [s].transform.position = new Vector3(Pos.x,Pos.y,-1f);
+        }
     }
 
     //Swipe mekaniğini çalıştır
@@ -400,25 +374,47 @@ public class GameController : MonoBehaviour
         var _tileWorldPos = GameGrid [SelectedTiles [r].x,SelectedTiles [r].y].TileWorldPosition;
         var _tilePos = SelectedTiles [r];
 
-        //Ardından yöne bağlı olarak tileların bilgilerini takas et
+        //Ardından yöne bağlı olarak altıgenlerin bilgilerini takas et
         for(var p = 0; p < 3; p++) {
+
+            //Bomba varsa bombayı yeni pozisyonuna taşı
+            if (GameGrid [SelectedTiles [r].x,SelectedTiles [r].y].TileType == "Bomb") {
+                for (var q = 0; q < Bombs.Count; q++) {
+                    if (Bombs [q].TileGridPosition == SelectedTiles[r]) {
+                        Bombs [q].TileGridPosition = SelectedTiles[(r - dir + 3) % 3];
+                        break;
+                    }
+                }
+            }
+
             if (p == 2) {
+                //Debug.Log("SelectedTiles r = " + SelectedTiles [r] + " , SelectedTile pos = " + _tilePos);
                 GameGrid [SelectedTiles [r].x,SelectedTiles [r].y].TileColor = _tileColor;
                 GameGrid [SelectedTiles [r].x,SelectedTiles [r].y].TileObject = _tileObject;
                 GameGrid [SelectedTiles [r].x,SelectedTiles [r].y].TileType = _tileType;
                 GameGrid [SelectedTiles [r].x,SelectedTiles [r].y].TileWorldPosition = _tileWorldPos;
-                SelectedTiles [r] = _tilePos;
+
+                //Editörden altıgenlerin pozisyonu görünebilsin
+                if (Application.isEditor) GameGrid [SelectedTiles [r].x,SelectedTiles [r].y].TileObject.GetComponent<TilePosition>().TilePositionVector = SelectedTiles [r];
+
+                //SelectedTiles [r] = _tilePos;
             }
             else {
-                GameGrid [SelectedTiles [r].x,SelectedTiles [r].y].TileColor = GameGrid [SelectedTiles [r+dir].x,SelectedTiles [r+dir].y].TileColor;
-                GameGrid [SelectedTiles [r].x,SelectedTiles [r].y].TileObject = GameGrid [SelectedTiles [r+dir].x,SelectedTiles [r+dir].y].TileObject;
-                GameGrid [SelectedTiles [r].x,SelectedTiles [r].y].TileType = GameGrid [SelectedTiles [r+dir].x,SelectedTiles [r+dir].y].TileType;
-                GameGrid [SelectedTiles [r].x,SelectedTiles [r].y].TileWorldPosition = GameGrid [SelectedTiles [r+dir].x,SelectedTiles [r+dir].y].TileWorldPosition;
-                SelectedTiles [r] = SelectedTiles [r+dir];
+                //Debug.Log("SelectedTiles r = " + SelectedTiles [r] + " , SelectedTile r+dir = " + SelectedTiles [r + dir]);
+                GameGrid [SelectedTiles [r].x,SelectedTiles [r].y].TileColor = GameGrid [SelectedTiles [r + dir].x,SelectedTiles [r + dir].y].TileColor;
+                GameGrid [SelectedTiles [r].x,SelectedTiles [r].y].TileObject = GameGrid [SelectedTiles [r + dir].x,SelectedTiles [r + dir].y].TileObject;
+                GameGrid [SelectedTiles [r].x,SelectedTiles [r].y].TileType = GameGrid [SelectedTiles [r + dir].x,SelectedTiles [r + dir].y].TileType;
+                GameGrid [SelectedTiles [r].x,SelectedTiles [r].y].TileWorldPosition = GameGrid [SelectedTiles [r + dir].x,SelectedTiles [r + dir].y].TileWorldPosition;
+
+                //Editörden altıgenlerin pozisyonu görünebilsin
+                if (Application.isEditor) GameGrid [SelectedTiles [r].x,SelectedTiles [r].y].TileObject.GetComponent<TilePosition>().TilePositionVector = SelectedTiles [r];
+
+                //Debug.Log("pos1: " + SelectedTiles[r]);
+                //SelectedTiles [r] = SelectedTiles [r + dir];
+                //Debug.Log("pos2: " + SelectedTiles[r]);*/
                 r += dir;
             }
         }
-
     }
 
     //Renk eşleşmesi olduğunda eşleşen altıgenleri yok eden fonksiyon
@@ -464,7 +460,7 @@ public class GameController : MonoBehaviour
     //Bir renk eşleşmesi durumunda altıgenler yok olduğunda, yok olan altıgenleri yukarıdan yeni altıgenler indirerek doldur
     IEnumerator ShiftTiles()
     {
-        yield return new WaitForSeconds(debugWaitingTime + 0.1f);
+        yield return new WaitForSeconds(WaitingTime + 0.1f);
         List<int> XList = new List<int>();
 
         //Her bir renk eşleşmesi pozisyonu için çalıştır
@@ -500,13 +496,25 @@ public class GameController : MonoBehaviour
                     GameGrid [pointX,targetTile].TileObject.transform.position = GetWorldPosition(pointX,emptyTile);
                     GameGrid [pointX,targetTile].Empty = true;
 
+                    if (GameGrid [pointX,targetTile].TileType == "Bomb") {
+                        for (var q = 0; q < Bombs.Count; q++) {
+                            if (Bombs [q].TileGridPosition == new Vector2Int(pointX,targetTile)) {
+                                Bombs [q].TileGridPosition = new Vector2Int(pointX,emptyTile);
+                                break;
+                            }
+                        }
+                    }
                     GameGrid [pointX,emptyTile].Empty = false;
                     GameGrid [pointX,emptyTile].TileObject = GameGrid [pointX,targetTile].TileObject;
                     GameGrid [pointX,emptyTile].TileColor = GameGrid [pointX,targetTile].TileColor;
                     GameGrid [pointX,emptyTile].TileType = GameGrid [pointX,targetTile].TileType;
                     GameGrid [pointX,emptyTile].TileWorldPosition = GameGrid [pointX,targetTile].TileWorldPosition;
+                    
+                    //Editörden altıgenlerin pozisyonu görünebilsin
+                    if (Application.isEditor) GameGrid [pointX,emptyTile].TileObject.GetComponent<TilePosition>().TilePositionVector = new Vector2Int(pointX,emptyTile); 
+
                     targetTile++;
-                    yield return new WaitForSeconds(debugWaitingTime);
+                    yield return new WaitForSeconds(WaitingTime);
                 }
                 else break;
             }
@@ -518,7 +526,7 @@ public class GameController : MonoBehaviour
             }
             for(var w = v; w < GridSize.y; w++) { 
                 CreateNewTiles(pointX,w);
-                yield return new WaitForSeconds(debugWaitingTime);
+                yield return new WaitForSeconds(WaitingTime);
             }
         }
         //Gerekli altıgenlerin aşağı inmesi ve yenilerinin yaratılması bittiğinde, tekrar eşleşme var mı diye kontrol et
@@ -526,8 +534,9 @@ public class GameController : MonoBehaviour
             SelectTileObjects(); //Yeri değişen ve yeni yaratılan altıgenler, yeni bir eşleşme yarattı mı?
             Swipe = false; //Her şey bittiğinde oyuncuya tekrar swipe yapabilme hakkını ver
             BombCountdown(); //Bombaların sayacını çalıştır
-            AnyMovesLeft(); //Yapılabilecek hareket kaldı mı?
-            TempBugFix(); //Geçici olarak bug fixlemek için yazdığım fonksiyon
+            if (!AnyMovesLeft()) { //Yapılabilecek hareket kaldı mı?
+                GameOver();
+            }
         }
         else {
             DestroyTiles(); //Tekrar eşleşme varsa eşleşen altıgenleri yok et
@@ -537,6 +546,7 @@ public class GameController : MonoBehaviour
     //Yeni altıgen yarat
     void CreateNewTiles(int pointX,int pointY)
     {
+        if (!GameGrid [pointX,pointY].Empty) return;
         GameObject tileObj = Instantiate(Tile,GetWorldPosition(pointX,pointY),Quaternion.identity,TileParent) as GameObject;
 
         //Rastgele bir renk ata
@@ -549,7 +559,8 @@ public class GameController : MonoBehaviour
         GameGrid [pointX,pointY].TileWorldPosition = tileObj.transform.position;
         GameGrid [pointX,pointY].Empty = false;
 
-        tileObj.GetComponent<TilePosition>().TilePositionVector = new Vector2Int(pointX,pointY); //Editörden altıgenlerin pozisyonu görünebilsin
+        //Editörden altıgenlerin pozisyonu görünebilsin
+        if (Application.isEditor) tileObj.GetComponent<TilePosition>().TilePositionVector = new Vector2Int(pointX,pointY); 
         
         string _tileType;
 
@@ -670,16 +681,6 @@ public class GameController : MonoBehaviour
         Instantiate(GameOverObject,CanvasObject.position,Quaternion.identity,CanvasObject);
     }
 
-    //Üçlü seçimdeki objeleri SelectedTileObjects arrayine koy / yenile
-    void SelectTileObjects()
-    {
-        for (var s = 0; s < SelectedTiles.Length; s++) {
-            SelectedTileObjects [s] = GameGrid [SelectedTiles [s].x,SelectedTiles [s].y].TileObject;
-            var Pos = SelectedTileObjects [s].transform.position;
-            SelectedTileObjects [s].transform.position = new Vector3(Pos.x,Pos.y,-1f);
-        }
-    }
-
     //Editörden altıgenlerin boyutunun ayarlanabilmesi için gereken fonksiyon
     void ScaleTiles()
     {
@@ -701,31 +702,5 @@ public class GameController : MonoBehaviour
         var main = PartSys.main;
         main.startColor = col;
 
-    }
-
-    //Yüzde bir ihtimalle falan, yaratılmaması gereken altıgenler yaratılıyor. Henüz bugı çözemedim, bu sebeple etrafından dolandım. 
-    //Ancak fırsatım olduğunda bugı çözüp bu fonksiyonu silicem.
-    void TempBugFix()
-    {
-        bool boolDestroy;
-        GameObject tileObj;
-        for(var h = 0; h < TileParent.transform.childCount; h++) {
-            tileObj = TileParent.transform.GetChild(h).gameObject;
-            boolDestroy = true;
-            for (var j = 0; j < GridSize.y; j++) {
-                if (boolDestroy) {
-                    for (var i = 0; i < GridSize.x; i++) {
-                        if (GameGrid [i,j].TileObject == tileObj) {
-                            boolDestroy = false;
-                            break;
-                        }
-                    }
-                }
-            }
-            if (boolDestroy) {
-                Destroy(tileObj,0.05f);
-                Debug.Log("TempFix");
-            }
-        }
     }
 }
